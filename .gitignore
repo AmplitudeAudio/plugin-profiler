@@ -1,0 +1,51 @@
+# Binary
+lib/
+libs/
+bin/
+obj/
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+tests/Debug/
+tests/Release/
+tests/audio_engine_test.dir/
+
+# XMake files
+.xmake/
+compile_commands.json
+
+# Gnumake
+Makefile
+
+# Visual Studio files
+.vs/
+.vscode/
+[bB]uild/
+*.sln
+*.user
+*.suo
+*.vcxproj
+*.vcxproj.filters
+[dD]ebug/
+Win32/
+
+# Jetbrains files
+.idea/
+cmake-build-*/
+
+# Zed files
+.zed/
+
+# Misc generated files
+gen/
+sdk/
+.DS_Store
+
+# CLangd cache
+.cache/
+
+# VCPKG
+vcpkg_installed/
