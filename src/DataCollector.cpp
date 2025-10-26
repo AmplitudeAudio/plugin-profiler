@@ -22,7 +22,6 @@ namespace SparkyStudios::Audio::Amplitude
 {
     ProfilerDataCollector::ProfilerDataCollector()
         : _initialized(false)
-        , _engine(nullptr)
         , _lastMemoryCheck(0)
         , _lastCpuCheck(0.0f)
         , _lastPerformanceUpdate(std::chrono::high_resolution_clock::now())
@@ -47,14 +46,13 @@ namespace SparkyStudios::Audio::Amplitude
             return true;
         }
 
-        _engine = amEngine;
-        if (!_engine)
+        if (!amEngine)
         {
             amLogError("[ProfilerDataCollector] Engine instance not available");
             return false;
         }
 
-        if (!_engine->IsInitialized())
+        if (!amEngine->IsInitialized())
         {
             amLogError("[ProfilerDataCollector] Engine not initialized");
             return false;
@@ -70,7 +68,7 @@ namespace SparkyStudios::Audio::Amplitude
         if (!_initialized)
             return;
 
-        _engine = nullptr;
+        amEngine = nullptr;
         _initialized = false;
         amLogInfo("[ProfilerDataCollector] Data collector deinitialized");
     }
@@ -84,28 +82,28 @@ namespace SparkyStudios::Audio::Amplitude
     {
         ProfilerEngineData data;
 
-        if (!_engine)
+        if (!amEngine)
         {
             amLogWarning("[ProfilerDataCollector] Engine not available for engine data collection");
             return data;
         }
 
         // Basic engine state
-        data.mIsInitialized = _engine->IsInitialized();
-        data.mEngineUptime = _engine->GetTotalTime();
-        data.mConfigFile = _engine->GetConfigurationPath();
+        data.mIsInitialized = amEngine->IsInitialized();
+        data.mEngineUptime = amEngine->GetTotalTime();
+        data.mConfigFile = amEngine->GetConfigurationPath();
 
         // Counts
-        data.mTotalEntityCount = _engine->GetMaxEntitiesCount();
-        data.mActiveEntityCount = _engine->GetActiveEntitiesCount(); // TODO: Get from engine
+        data.mTotalEntityCount = amEngine->GetMaxEntitiesCount();
+        data.mActiveEntityCount = amEngine->GetActiveEntitiesCount(); // TODO: Get from engine
         data.mTotalChannelCount = 0; // TODO: Get from engine
         data.mActiveChannelCount = 0; // TODO: Get from engine
-        data.mTotalListenerCount = _engine->GetMaxListenersCount();
-        data.mActiveListenerCount = _engine->GetActiveListenersCount(); // TODO: Get from engine
-        data.mTotalEnvironmentCount = _engine->GetMaxEnvironmentsCount();
-        data.mActiveEnvironmentCount = _engine->GetActiveEnvironmentsCount(); // TODO: Get from engine
-        data.mTotalRoomCount = _engine->GetMaxRoomsCount();
-        data.mActiveRoomCount = _engine->GetActiveRoomsCount(); // TODO: Get from engine
+        data.mTotalListenerCount = amEngine->GetMaxListenersCount();
+        data.mActiveListenerCount = amEngine->GetActiveListenersCount(); // TODO: Get from engine
+        data.mTotalEnvironmentCount = amEngine->GetMaxEnvironmentsCount();
+        data.mActiveEnvironmentCount = amEngine->GetActiveEnvironmentsCount(); // TODO: Get from engine
+        data.mTotalRoomCount = amEngine->GetMaxRoomsCount();
+        data.mActiveRoomCount = amEngine->GetActiveRoomsCount(); // TODO: Get from engine
 
         // Performance metrics
         data.mCpuUsagePercent = GetCurrentCpuUsage();
@@ -114,13 +112,13 @@ namespace SparkyStudios::Audio::Amplitude
         data.mActiveVoiceCount = GetActiveVoiceCount();
         data.mMaxVoiceCount = GetMaxVoiceCount();
 
-        const auto device = _engine->GetMixer()->GetDeviceDescription();
+        const auto device = amEngine->GetMixer()->GetDeviceDescription();
 
         // Audio system state
         data.mSampleRate = device.mDeviceOutputSampleRate;
         data.mChannelCount = static_cast<AmInt16>(device.mDeviceOutputChannels);
         data.mFrameCount = device.mOutputBufferSize;
-        data.mMasterGain = _engine->GetMasterGain();
+        data.mMasterGain = amEngine->GetMasterGain();
 
         // Loaded assets
         data.mLoadedSoundBanks = GetLoadedSoundBanks();
@@ -135,13 +133,13 @@ namespace SparkyStudios::Audio::Amplitude
         ProfilerEntityData data;
         data.mEntityId = entityId;
 
-        if (!_engine)
+        if (!amEngine)
         {
             amLogWarning("[ProfilerDataCollector] Engine not available for entity data collection");
             return data;
         }
 
-        const auto entity = _engine->GetEntity(entityId);
+        const auto entity = amEngine->GetEntity(entityId);
         if (!entity.Valid())
         {
             amLogWarning("[ProfilerDataCollector] Entity not found for data collection");
@@ -174,13 +172,13 @@ namespace SparkyStudios::Audio::Amplitude
         ProfilerChannelData data;
         data.mChannelId = channelId;
 
-        if (!_engine)
+        if (!amEngine)
         {
             amLogWarning("[ProfilerDataCollector] Engine not available for channel data collection");
             return data;
         }
 
-        const Channel channel = _engine->GetChannel(channelId);
+        const Channel channel = amEngine->GetChannel(channelId);
         if (!channel.Valid())
         {
             amLogWarning("[ProfilerDataCollector] Channel not found for data collection");
@@ -218,10 +216,10 @@ namespace SparkyStudios::Audio::Amplitude
         ProfilerListenerData data;
         data.mListenerId = listenerId;
 
-        if (!_engine)
+        if (!amEngine)
             return data;
 
-        const auto listener = _engine->GetListener(listenerId);
+        const auto listener = amEngine->GetListener(listenerId);
         if (!listener.Valid())
         {
             amLogWarning("[ProfilerDataCollector] Listener not found for data collection");
@@ -275,7 +273,7 @@ namespace SparkyStudios::Audio::Amplitude
     {
         std::vector<AmEntityID> entityIds;
 
-        if (!_engine)
+        if (!amEngine)
             return entityIds;
 
         // TODO: Implement actual entity enumeration from engine
@@ -288,7 +286,7 @@ namespace SparkyStudios::Audio::Amplitude
     {
         std::vector<AmChannelID> channelIds;
 
-        if (!_engine)
+        if (!amEngine)
         {
             return channelIds;
         }
@@ -303,7 +301,7 @@ namespace SparkyStudios::Audio::Amplitude
     {
         std::vector<AmListenerID> listenerIds;
 
-        if (!_engine)
+        if (!amEngine)
         {
             return listenerIds;
         }
@@ -431,7 +429,7 @@ namespace SparkyStudios::Audio::Amplitude
 
     AmUInt32 ProfilerDataCollector::GetActiveVoiceCount() const
     {
-        if (!_engine)
+        if (!amEngine)
         {
             return 0;
         }
@@ -442,7 +440,7 @@ namespace SparkyStudios::Audio::Amplitude
 
     AmUInt32 ProfilerDataCollector::GetMaxVoiceCount() const
     {
-        if (!_engine)
+        if (!amEngine)
         {
             return 0;
         }
@@ -455,7 +453,7 @@ namespace SparkyStudios::Audio::Amplitude
     {
         std::vector<AmString> plugins;
 
-        if (!_engine)
+        if (!amEngine)
         {
             return plugins;
         }
@@ -472,7 +470,7 @@ namespace SparkyStudios::Audio::Amplitude
     {
         std::vector<AmString> soundBanks;
 
-        if (!_engine)
+        if (!amEngine)
         {
             return soundBanks;
         }
@@ -487,7 +485,7 @@ namespace SparkyStudios::Audio::Amplitude
     {
         std::unordered_map<AmString, AmUInt32> counts;
 
-        if (!_engine)
+        if (!amEngine)
         {
             return counts;
         }

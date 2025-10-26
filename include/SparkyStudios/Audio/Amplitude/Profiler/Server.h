@@ -316,11 +316,6 @@ namespace SparkyStudios::Audio::Amplitude
         MessageEventCallback _onMessageReceived;
         ErrorEventCallback _onError;
 
-        // Platform-specific data
-#if AM_PLATFORM_WINDOWS
-        bool _wsaInitialized;
-#endif
-
         // Constants
         static constexpr AmSize kMaxMessageSize = 1024 * 1024; // 1MB max message size
         static constexpr AmInt32 kSocketReceiveTimeout = 5000; // 5 seconds

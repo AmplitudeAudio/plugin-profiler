@@ -260,7 +260,6 @@ namespace SparkyStudios::Audio::Amplitude
 
         // Member variables
         bool _initialized;
-        Engine* _engine; // Reference to the engine instance
 
         // Performance monitoring state
         mutable AmUInt64 _lastMemoryCheck;

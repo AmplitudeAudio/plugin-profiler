@@ -163,12 +163,12 @@ namespace SparkyStudios::Audio::Amplitude
         AmMutexHandle _configMutex;
 
         // Data management
-        std::unique_ptr<ProfilerDataCollector> _dataCollector;
-        std::unique_ptr<ProfilerMessageQueue> _messageQueue;
-        std::unique_ptr<ProfilerMessagePool> _messagePool;
+        AmUniquePtr<ProfilerDataCollector, eMemoryPoolKind_IO> _dataCollector;
+        AmUniquePtr<ProfilerMessageQueue, eMemoryPoolKind_IO> _messageQueue;
+        AmUniquePtr<ProfilerMessagePool, eMemoryPoolKind_IO> _messagePool;
 
         // Network
-        std::unique_ptr<ProfilerServer> _networkServer;
+        AmUniquePtr<ProfilerServer, eMemoryPoolKind_IO> _networkServer;
 
         // Statistics
         mutable AmMutexHandle _statisticsMutex;

@@ -21,10 +21,13 @@ namespace SparkyStudios::Audio::Amplitude
 {
     // Static member definitions
     AmUniquePtr<ProfilerManager, eMemoryPoolKind_Engine> ProfilerManager::_sInstance = nullptr;
-    AmMutexHandle ProfilerManager::_sInstanceMutex = Thread::CreateMutex();
+    AmMutexHandle ProfilerManager::_sInstanceMutex = nullptr;
 
     ProfilerManager* ProfilerManager::GetInstance()
     {
+        if (_sInstanceMutex == nullptr)
+            _sInstanceMutex = Thread::CreateMutex();
+
         Thread::LockMutex(_sInstanceMutex);
         if (!_sInstance)
             _sInstance = AmUniquePtr<ProfilerManager, eMemoryPoolKind_Engine>(ampoolnew(eMemoryPoolKind_Engine, ProfilerManager));
@@ -55,8 +58,8 @@ namespace SparkyStudios::Audio::Amplitude
         _statisticsMutex = Thread::CreateMutex();
         _callbackMutex = Thread::CreateMutex();
 
-        _messageQueue = std::make_unique<ProfilerMessageQueue>();
-        _messagePool = std::make_unique<ProfilerMessagePool>();
+        _messageQueue = AmUniquePtr<ProfilerMessageQueue, eMemoryPoolKind_IO>(ampoolnew(eMemoryPoolKind_IO, ProfilerMessageQueue));
+        _messagePool = AmUniquePtr<ProfilerMessagePool, eMemoryPoolKind_IO>(ampoolnew(eMemoryPoolKind_IO, ProfilerMessagePool));
 
         // Initialize statistics
         Thread::LockMutex(_statisticsMutex);
@@ -101,7 +104,7 @@ namespace SparkyStudios::Audio::Amplitude
         }
 
         // Initialize data collector
-        _dataCollector = std::make_unique<ProfilerDataCollector>();
+        _dataCollector = AmUniquePtr<ProfilerDataCollector, eMemoryPoolKind_IO>(ampoolnew(eMemoryPoolKind_IO, ProfilerDataCollector));
 
         // Start network server if enabled
         if (_config.mEnableNetworking)
@@ -357,7 +360,7 @@ namespace SparkyStudios::Audio::Amplitude
             return true;
         }
 
-        _networkServer = std::make_unique<ProfilerServer>();
+        _networkServer = AmUniquePtr<ProfilerServer, eMemoryPoolKind_IO>(ampoolnew(eMemoryPoolKind_IO, ProfilerServer));
 
         if (!_networkServer->Start(_config.mServerPort, _config.mBindAddress, _config.mMaxClients))
         {

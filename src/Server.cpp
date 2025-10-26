@@ -39,9 +39,6 @@ namespace SparkyStudios::Audio::Amplitude
         , _maxClients(8)
         , _acceptThread(nullptr)
         , _nextClientId(1)
-#if AM_PLATFORM_WINDOWS
-        , _wsaInitialized(false)
-#endif
     {
         _clientsMutex = Thread::CreateMutex();
         _statisticsMutex = Thread::CreateMutex();
@@ -53,7 +50,7 @@ namespace SparkyStudios::Audio::Amplitude
         _statistics.mServerStartTime = std::chrono::high_resolution_clock::now();
         Thread::UnlockMutex(_statisticsMutex);
 
-        amLogDebug("[ProfilerServer] Created profiler server");
+        amLogInfo("[ProfilerServer] Created profiler server");
     }
 
     ProfilerServer::~ProfilerServer()
@@ -67,7 +64,7 @@ namespace SparkyStudios::Audio::Amplitude
         if (_callbacksMutex)
             Thread::DestroyMutex(_callbacksMutex);
 
-        amLogDebug("[ProfilerServer] Destroyed profiler server");
+        amLogInfo("[ProfilerServer] Destroyed profiler server");
     }
 
     bool ProfilerServer::Start(AmUInt16 port, const AmString& bindAddress, AmUInt32 maxClients)
@@ -109,7 +106,8 @@ namespace SparkyStudios::Audio::Amplitude
         }
 
         // Start accept thread
-        _running = true;
+        gLoop = uWS::Loop::get();
+
         _acceptThread = Thread::CreateThread(
             [](AmVoidPtr userData)
             {
@@ -142,8 +140,14 @@ namespace SparkyStudios::Audio::Amplitude
 
         _running = false;
 
+        // Disconnect all clients
+        _disconnectAllClients();
+
         // Close server socket to stop accepting new connections
         _closeServerSocket();
+
+        // Cleanup networking
+        _cleanupNetworking();
 
         // Wait for accept thread to finish
         if (_acceptThread)
@@ -152,12 +156,6 @@ namespace SparkyStudios::Audio::Amplitude
             Thread::Release(_acceptThread);
             _acceptThread = nullptr;
         }
-
-        // Disconnect all clients
-        _disconnectAllClients();
-
-        // Cleanup networking
-        _cleanupNetworking();
 
         _initialized = false;
         amLogInfo("[ProfilerServer] Server stopped");
@@ -212,7 +210,7 @@ namespace SparkyStudios::Audio::Amplitude
         Thread::UnlockMutex(_clientsMutex);
 
         if (sentCount > 0)
-            amLogDebug("[ProfilerServer] Broadcast message to %d clients (%zu bytes)", sentCount, jsonMessage.length());
+            amLogInfo("[ProfilerServer] Broadcast message to %d clients (%zu bytes)", sentCount, jsonMessage.length());
 
         return sentCount;
     }
@@ -380,16 +378,6 @@ namespace SparkyStudios::Audio::Amplitude
 
     bool ProfilerServer::_initializeNetworking()
     {
-#if AM_PLATFORM_WINDOWS
-        WSADATA wsaData;
-        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-        {
-            amLogError("[ProfilerServer] WSAStartup failed");
-            return false;
-        }
-        _wsaInitialized = true;
-#endif
-
         gSocket.reset(ampoolnew(eMemoryPoolKind_IO, uWS::App));
         return gSocket.get() != nullptr;
     }
@@ -398,14 +386,6 @@ namespace SparkyStudios::Audio::Amplitude
     {
         gSocket.reset(nullptr);
         gLoop = nullptr;
-
-#if AM_PLATFORM_WINDOWS
-        if (_wsaInitialized)
-        {
-            WSACleanup();
-            _wsaInitialized = false;
-        }
-#endif
     }
 
     bool ProfilerServer::_createServerSocket()
@@ -462,7 +442,7 @@ namespace SparkyStudios::Audio::Amplitude
                           Thread::UnlockMutex(self->_callbacksMutex);
                       });
 
-                  amLogDebug("[ProfilerServer] Received message from client %d (%zu bytes)", clientId, message.length());
+                  amLogInfo("[ProfilerServer] Received message from client %d (%zu bytes)", clientId, message.length());
               },
 
               .drain =
@@ -520,59 +500,72 @@ namespace SparkyStudios::Audio::Amplitude
 
     void ProfilerServer::_closeServerSocket()
     {
-        if (gSocket && gLoop)
-        {
-            gLoop->defer(
-                [this]()
-                {
-                    _disconnectAllClients();
-                });
-        }
+        gSocket->close();
     }
 
     bool ProfilerServer::_bindAndListen()
     {
-        ProfilerServer* self = this;
-
-        gSocket->listen(
-            _port,
-            [self](auto* listenSocket)
-            {
-                if (listenSocket)
-                {
-                    amLogInfo("[ProfilerServer] Listening for connections on port %d", self->_port);
-                }
-                else
-                {
-                    amLogError("[ProfilerServer] Failed to listen on port %d", self->_port);
-                    self->_triggerEvent(
-                        [self]()
-                        {
-                            Thread::LockMutex(self->_callbacksMutex);
-                            if (self->_onError)
-                            {
-                                self->_onError("Failed to bind to port");
-                            }
-                            Thread::UnlockMutex(self->_callbacksMutex);
-                        });
-                }
-            });
-
+        // Actual listening will happen in the accept thread
+        // This method is just for compatibility with the existing API
         return true;
     }
 
     void ProfilerServer::_acceptThreadFunction()
     {
-        amLogDebug("[ProfilerServer] Accept thread started");
+        amLogInfo("[ProfilerServer] Accept thread started");
 
-        // Run the uWebSockets event loop
+        // Set up the listen callback and start the server
+        ProfilerServer* self = this;
+
         if (gSocket)
         {
-            gLoop = uWS::Loop::get();
-            gSocket->run();
+            // Configure listening with callback
+            gSocket->listen(
+                _port,
+                [self](auto* listenSocket)
+                {
+                    if (listenSocket)
+                    {
+                        amLogInfo("[ProfilerServer] Successfully listening on port %d", self->_port);
+                    }
+                    else
+                    {
+                        amLogError("[ProfilerServer] Failed to listen on port %d", self->_port);
+                        self->_triggerEvent(
+                            [self]()
+                            {
+                                Thread::LockMutex(self->_callbacksMutex);
+                                if (self->_onError)
+                                {
+                                    self->_onError("Failed to bind to port");
+                                }
+                                Thread::UnlockMutex(self->_callbacksMutex);
+                            });
+                    }
+                });
+
+            // Get the current loop before running
+            amLogInfo("[ProfilerServer] Starting uWS event loop on port %d...", _port);
+
+            try
+            {
+                // This should block until the server is stopped
+                _running = true;
+                gLoop->run();
+                amLogInfo("[ProfilerServer] uWS event loop exited");
+            } catch (const std::exception& e)
+            {
+                amLogError("[ProfilerServer] Event loop exception: %s", e.what());
+            }
+
+            _running = false;
+        }
+        else
+        {
+            amLogError("[ProfilerServer] gSocket is null, cannot run event loop");
         }
 
-        amLogDebug("[ProfilerServer] Accept thread ended");
+        amLogInfo("[ProfilerServer] Accept thread ended");
     }
 
     void ProfilerServer::_clientThreadFunction(SocketHandle clientSocket, ProfilerClientID clientId)
